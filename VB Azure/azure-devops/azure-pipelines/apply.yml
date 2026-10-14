@@ -1,0 +1,114 @@
+# Manual apply / remediate for Veeam Backup for Microsoft Azure policies.
+# Runs in an Azure DevOps Environment so you can require an approval before anything changes the appliance.
+# Defaults are safe: nothing is remediated, and dry run is ON.
+
+trigger: none        # manual only
+pr: none
+
+parameters:
+  - name: remediate
+    displayName: Remediate (update drifted policies, recreate deleted ones)
+    type: boolean
+    default: false
+  - name: dryRun
+    displayName: Dry run (show what would change, change nothing)
+    type: boolean
+    default: true
+  - name: unmanaged
+    displayName: Unmanaged policies (needs Remediate)
+    type: string
+    default: Ignore
+    values: [ Ignore, Adopt ]      # Delete is deliberately not offered in the pipeline - do that by hand
+
+pool:
+  vmImage: ubuntu-latest                   # replace with "name: <self-hosted pool>" if the appliance firewall needs fixed IPs
+
+variables:
+  # ---- REPLACE EVERY <PLACEHOLDER> BELOW WITH YOUR OWN VALUES ----
+  azureServiceConnection: '<SERVICE-CONNECTION-NAME>'
+  keyVaultName:           '<KEY-VAULT-NAME>'
+  keyVaultUsernameSecretName: '<USERNAME-SECRET-NAME>'      # name of the Key Vault secret holding the VBA user name
+  keyVaultPasswordSecretName: '<PASSWORD-SECRET-NAME>'      # name of the Key Vault secret holding the VBA password
+  stateStorageAccount:    '<STORAGE-ACCOUNT-NAME>'
+  stateContainer:         '<STATE-CONTAINER-NAME>'
+  vbaAppliance:           '<VBA-IP-ADDRESS>'
+  environmentName:        '<ENVIRONMENT-NAME>'         # Environment with an Approval check
+  # --------------------
+
+stages:
+  - stage: Apply
+    jobs:
+      - deployment: ApplyPolicies
+        displayName: Apply VBA policies
+        environment: ${{ variables.environmentName }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: AzureKeyVault@2
+                  displayName: Read VBA credentials from Key Vault
+                  inputs:
+                    azureSubscription: ${{ variables.azureServiceConnection }}
+                    KeyVaultName: ${{ variables.keyVaultName }}
+                    SecretsFilter: '${{ variables.keyVaultUsernameSecretName }},${{ variables.keyVaultPasswordSecretName }}'
+                    RunAsPreJob: false
+
+                - task: AzureCLI@2
+                  displayName: Download state.json (if it exists)
+                  inputs:
+                    azureSubscription: ${{ variables.azureServiceConnection }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      exists=$(az storage blob exists --auth-mode login --account-name "$(stateStorageAccount)" \
+                                 --container-name "$(stateContainer)" --name state.json --query exists -o tsv)
+                      if [ "$exists" = "true" ]; then
+                        az storage blob download --auth-mode login --account-name "$(stateStorageAccount)" \
+                          --container-name "$(stateContainer)" --name state.json --file "$(Build.SourcesDirectory)/state.json" --overwrite
+                      else
+                        echo "No state.json yet - it will be created."
+                      fi
+
+                - pwsh: |
+                    # Hashtable splatting passes real named parameters (an array would be treated as positional values)
+                    $a = @{
+                      Appliance = '$(vbaAppliance)'
+                      PolicyDir = './policies'
+                      StatePath = './state.json'
+                    }
+                    if ('${{ lower(parameters.remediate) }}' -eq 'true') { $a.Remediate = $true }
+                    if ('${{ lower(parameters.dryRun) }}'    -eq 'true') { $a.DryRun    = $true }
+                    if ('${{ lower(parameters.remediate) }}' -eq 'true' -and '${{ parameters.unmanaged }}' -ne 'Ignore') {
+                      $a.Unmanaged = '${{ parameters.unmanaged }}'
+                    }
+                    Write-Host ("Running: Invoke-VbaPolicies.ps1 " + (($a.GetEnumerator() | ForEach-Object { "-$($_.Key) $($_.Value)" }) -join ' '))
+                    ./scripts/Invoke-VbaPolicies.ps1 @a
+                    exit $LASTEXITCODE
+                  displayName: Apply policies
+                  env:
+                    VBA_USERNAME: $(${{ variables.keyVaultUsernameSecretName }})
+                    VBA_PASSWORD: $(${{ variables.keyVaultPasswordSecretName }})
+
+                # Persist state only when something could have changed (not on dry runs)
+                - task: AzureCLI@2
+                  displayName: Upload state.json
+                  condition: and(succeededOrFailed(), eq('${{ lower(parameters.dryRun) }}', 'false'))
+                  inputs:
+                    azureSubscription: ${{ variables.azureServiceConnection }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      if [ -f "$(Build.SourcesDirectory)/state.json" ]; then
+                        az storage blob upload --auth-mode login --account-name "$(stateStorageAccount)" \
+                          --container-name "$(stateContainer)" --name state.json --file "$(Build.SourcesDirectory)/state.json" --overwrite
+                      fi
+
+                # Adopt writes new policy files onto the agent; publish them so you can review and commit them to the repo
+                - task: PublishPipelineArtifact@1
+                  displayName: Publish policy files (adopted policies)
+                  condition: and(succeededOrFailed(), eq('${{ parameters.unmanaged }}', 'Adopt'), eq('${{ lower(parameters.dryRun) }}', 'false'))
+                  inputs:
+                    targetPath: '$(Build.SourcesDirectory)/policies'
+                    artifact: policies

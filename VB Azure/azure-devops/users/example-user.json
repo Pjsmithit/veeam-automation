@@ -1,0 +1,7 @@
+{
+  "name": "<VBA-USERNAME>",
+  "description": "Administrator account (also used by the pipelines to sign in)",
+  "role": "PortalAdmin",
+  "type": "Internal",
+  "mfaEnabled": false
+}

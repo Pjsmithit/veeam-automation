@@ -1,0 +1,92 @@
+# Manual apply for the EDITABLE settings of existing backup repositories (name, description, concurrency limit,
+# storage consumption limit). It never creates or deletes repositories and never changes immutability, encryption,
+# tier, type or storage location. Runs in an Environment so an approval can be required first.
+# Defaults are safe: dry run is ON.
+
+trigger: none        # manual only
+pr: none
+
+parameters:
+  - name: dryRun
+    displayName: Dry run (show what would change, change nothing)
+    type: boolean
+    default: true
+
+  - name: createMissing
+    displayName: Also CREATE repositories that are in a file but missing on the appliance (Azure storage repositories only)
+    type: boolean
+    default: false
+  - name: importExistingBackups
+    displayName: When creating, import backups already in the target folder
+    type: boolean
+    default: false
+
+pool:
+  vmImage: ubuntu-latest                  # replace with "name: <self-hosted pool>" if the appliance firewall needs fixed IPs
+
+variables:
+  # ---- REPLACE EVERY <PLACEHOLDER> BELOW WITH YOUR OWN VALUES (same values as the other pipelines) ----
+  azureServiceConnection: '<SERVICE-CONNECTION-NAME>'
+  keyVaultName:           '<KEY-VAULT-NAME>'
+  keyVaultUsernameSecretName: '<USERNAME-SECRET-NAME>'      # name of the Key Vault secret holding the VBA user name
+  keyVaultPasswordSecretName: '<PASSWORD-SECRET-NAME>'      # name of the Key Vault secret holding the VBA password
+  keyVaultRepoPasswordSecretName: '<REPO-PASSWORD-SECRET-NAME>'   # secret holding the repository encryption password (used only when creating encrypted repositories)
+  vbaAppliance:           '<VBA-IP-ADDRESS>'
+  environmentName:        '<ENVIRONMENT-NAME>'         # Environment with an Approval check
+  # ---------------------------------------------------------
+
+stages:
+  - stage: Apply
+    jobs:
+      - deployment: ApplyRepositories
+        displayName: Apply VBA repository settings
+        environment: ${{ variables.environmentName }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: AzureKeyVault@2
+                  displayName: Read VBA credentials from Key Vault
+                  inputs:
+                    azureSubscription: ${{ variables.azureServiceConnection }}
+                    KeyVaultName: ${{ variables.keyVaultName }}
+                    SecretsFilter: '${{ variables.keyVaultUsernameSecretName }},${{ variables.keyVaultPasswordSecretName }}'
+                    RunAsPreJob: false
+
+                # Only needed when creating an encrypted repository: the Key Vault secret named in keyVaultRepoPasswordSecretName (the repository encryption password)
+                - task: AzureKeyVault@2
+                  displayName: Read repository encryption password from Key Vault
+                  condition: eq('${{ lower(parameters.createMissing) }}', 'true')
+                  inputs:
+                    azureSubscription: ${{ variables.azureServiceConnection }}
+                    KeyVaultName: ${{ variables.keyVaultName }}
+                    SecretsFilter: '${{ variables.keyVaultRepoPasswordSecretName }}'
+                    RunAsPreJob: false
+
+                - pwsh: |
+                    # Hashtable splatting passes real named parameters
+                    $a = @{
+                      Appliance  = '$(vbaAppliance)'
+                      RepoDir    = './repositories'
+                      ReportPath = '$(Build.ArtifactStagingDirectory)/repository-apply-report.json'
+                    }
+                    if ('${{ lower(parameters.dryRun) }}' -eq 'true') { $a.DryRun = $true }
+                    if ('${{ lower(parameters.createMissing) }}' -eq 'true') { $a.CreateMissing = $true }
+                    if ('${{ lower(parameters.importExistingBackups) }}' -eq 'true') { $a.ImportIfFolderHasBackup = $true }
+                    Write-Host ("Running: Invoke-VbaRepositories.ps1 " + (($a.GetEnumerator() | ForEach-Object { "-$($_.Key) $($_.Value)" }) -join ' '))
+                    ./scripts/Invoke-VbaRepositories.ps1 @a
+                    exit $LASTEXITCODE
+                  displayName: Apply repository settings
+                  env:
+                    VBA_USERNAME: $(${{ variables.keyVaultUsernameSecretName }})
+                    VBA_PASSWORD: $(${{ variables.keyVaultPasswordSecretName }})
+                    VBA_REPO_PASSWORD: $(${{ variables.keyVaultRepoPasswordSecretName }})     # only set when createMissing is on; otherwise ignored
+
+                - task: PublishPipelineArtifact@1
+                  displayName: Publish apply report
+                  condition: always()
+                  inputs:
+                    targetPath: '$(Build.ArtifactStagingDirectory)/repository-apply-report.json'
+                    artifact: repository-apply-report

@@ -1,0 +1,19 @@
+# Generated output from the scripts (may contain data from a real appliance)
+state.json
+*drift-report.json
+repositories-raw.json
+
+# Baselines collected from a live appliance
+tmp-baseline/
+
+# Local secrets and environment files
+.env
+*.env
+*.pfx
+*.pem
+*.key
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/

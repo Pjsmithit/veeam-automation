@@ -1,0 +1,54 @@
+# Weekly drift check for Veeam Backup for Microsoft Azure BACKUP REPOSITORIES (including Veeam Data Cloud Vault).
+# DETECTION ONLY: read-only, never changes the appliance. Fails the run when a repository setting differs from
+# repositories/*.json, when a listed repository is missing, or when an unlisted (unmanaged) repository exists.
+
+trigger: none
+
+schedules:
+  - cron: '0 7 * * 1'                      # Mondays 07:00 UTC (staggered after the policy and user checks)
+    displayName: Weekly repository drift check
+    branches:
+      include: [ main ]
+    always: true
+
+pool:
+  vmImage: ubuntu-latest                   # replace with "name: <self-hosted pool>" if the appliance firewall needs fixed IPs
+
+variables:
+  # ---- REPLACE EVERY <PLACEHOLDER> BELOW WITH YOUR OWN VALUES (same values as the other drift pipelines) ----
+  azureServiceConnection: '<SERVICE-CONNECTION-NAME>'
+  keyVaultName:           '<KEY-VAULT-NAME>'
+  keyVaultUsernameSecretName: '<USERNAME-SECRET-NAME>'      # name of the Key Vault secret holding the VBA user name
+  keyVaultPasswordSecretName: '<PASSWORD-SECRET-NAME>'      # name of the Key Vault secret holding the VBA password
+  vbaAppliance:           '<VBA-IP-ADDRESS>'
+  # ---------------------------------------------------------------
+
+steps:
+  - checkout: self
+
+  - task: AzureKeyVault@2
+    displayName: Read VBA credentials from Key Vault
+    inputs:
+      azureSubscription: ${{ variables.azureServiceConnection }}
+      KeyVaultName: ${{ variables.keyVaultName }}
+      SecretsFilter: '${{ variables.keyVaultUsernameSecretName }},${{ variables.keyVaultPasswordSecretName }}'
+      RunAsPreJob: false
+
+  - pwsh: |
+      ./scripts/Test-VbaRepositoryDrift.ps1 `
+        -Appliance '$(vbaAppliance)' `
+        -RepoDir ./repositories `
+        -ReportPath '$(Build.ArtifactStagingDirectory)/repository-drift-report.json' `
+        -FailOnUnmanaged
+      exit $LASTEXITCODE
+    displayName: Check repositories for drift (detect only)
+    env:
+      VBA_USERNAME: $(${{ variables.keyVaultUsernameSecretName }})
+      VBA_PASSWORD: $(${{ variables.keyVaultPasswordSecretName }})
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish repository drift report
+    condition: always()
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/repository-drift-report.json'
+      artifact: repository-drift-report

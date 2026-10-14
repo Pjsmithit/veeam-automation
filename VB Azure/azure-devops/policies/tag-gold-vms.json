@@ -1,0 +1,32 @@
+{
+  "name": "Tag-Gold-VMs",
+  "description": "Created via REST API - backs up VMs tagged Backup=Gold",
+  "isEnabled": true,
+  "tenantId": "<AZURE-TENANT-ID>",
+  "serviceAccountId": "<SERVICE-ACCOUNT-UUID>",
+  "backupType": "SelectedItems",
+  "regions": [
+    { "regionId": "<REGION-ID e.g. from -ListIds>" }
+  ],
+  "selectedItems": {
+    "tags": [
+      { "name": "Backup", "value": "Gold" }
+    ]
+  },
+  "snapshotSettings": {
+    "copyOriginalTags": true,
+    "applicationAwareSnapshot": false,
+    "additionalTags": []
+  },
+  "retrySettings": { "retryCount": 3 },
+  "dailySchedule": {
+    "dailyType": "Everyday",
+    "runsPerHour": 1,
+    "snapshotSchedule": { "hours": [ 2 ], "snapshotsToKeep": 3 },
+    "backupSchedule": {
+      "hours": [ 2 ],
+      "retention": { "timeRetentionDuration": 14, "retentionDurationType": "Days" },
+      "targetRepositoryId": "<REPOSITORY-ID>"
+    }
+  }
+}

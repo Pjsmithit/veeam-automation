@@ -1,0 +1,73 @@
+# Weekly drift check for Veeam Backup for Microsoft Azure policies. Read-only: never changes the appliance.
+# Fails the run (exit 1 = drift/unmanaged policies, 2 = a managed policy is missing) so it shows red and notifies.
+
+trigger: none
+
+schedules:
+  - cron: '0 6 * * 1'                      # Mondays 06:00 UTC
+    displayName: Weekly drift check
+    branches:
+      include: [ main ]
+    always: true                           # run even if there are no code changes
+
+pool:
+  vmImage: ubuntu-latest                   # replace with "name: <self-hosted pool>" if the appliance firewall needs fixed IPs
+
+variables:
+  # ---- REPLACE EVERY <PLACEHOLDER> BELOW WITH YOUR OWN VALUES ----
+  azureServiceConnection: '<SERVICE-CONNECTION-NAME>'      # Azure DevOps service connection (workload identity federation)
+  keyVaultName:           '<KEY-VAULT-NAME>'
+  keyVaultUsernameSecretName: '<USERNAME-SECRET-NAME>'      # name of the Key Vault secret holding the VBA user name
+  keyVaultPasswordSecretName: '<PASSWORD-SECRET-NAME>'      # name of the Key Vault secret holding the VBA password
+  stateStorageAccount:    '<STORAGE-ACCOUNT-NAME>'
+  stateContainer:         '<STATE-CONTAINER-NAME>'
+  vbaAppliance:           '<VBA-IP-ADDRESS>'           # public IP or FQDN of the VBA appliance
+  # --------------------
+
+steps:
+  - checkout: self
+
+  # The two Key Vault secrets named in the variables above become secret pipeline variables with the same names
+  - task: AzureKeyVault@2
+    displayName: Read VBA credentials from Key Vault
+    inputs:
+      azureSubscription: ${{ variables.azureServiceConnection }}
+      KeyVaultName: ${{ variables.keyVaultName }}
+      SecretsFilter: '${{ variables.keyVaultUsernameSecretName }},${{ variables.keyVaultPasswordSecretName }}'
+      RunAsPreJob: false
+
+  - task: AzureCLI@2
+    displayName: Download state.json (if it exists)
+    inputs:
+      azureSubscription: ${{ variables.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        exists=$(az storage blob exists --auth-mode login --account-name "$(stateStorageAccount)" \
+                   --container-name "$(stateContainer)" --name state.json --query exists -o tsv)
+        if [ "$exists" = "true" ]; then
+          az storage blob download --auth-mode login --account-name "$(stateStorageAccount)" \
+            --container-name "$(stateContainer)" --name state.json --file "$(Build.SourcesDirectory)/state.json" --overwrite
+        else
+          echo "No state.json yet - policies will be matched by name."
+        fi
+
+  - pwsh: |
+      ./scripts/Test-VbaPolicyDrift.ps1 `
+        -Appliance '$(vbaAppliance)' `
+        -PolicyDir ./policies `
+        -StatePath ./state.json `
+        -ReportPath '$(Build.ArtifactStagingDirectory)/drift-report.json' `
+        -FailOnOrphans
+      exit $LASTEXITCODE
+    displayName: Check policies for drift
+    env:
+      VBA_USERNAME: $(${{ variables.keyVaultUsernameSecretName }})
+      VBA_PASSWORD: $(${{ variables.keyVaultPasswordSecretName }})
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish drift report
+    condition: always()
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/drift-report.json'
+      artifact: drift-report
