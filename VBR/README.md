@@ -15,14 +15,14 @@
 
 ## What this is
 
-A collection of examples showing how to automate Veeam products with their APIs and PowerShell. Each folder is a self-contained project with its own README.
+A collection of examples showing how to automate Veeam products with their APIs, PowerShell and Terraform. Each folder is a self-contained project with its own README.
 
 ## Contents
 
 | Folder | What it contains |
 |---|---|
 | [VBAzure](VBAzure/) | Infrastructure-as-code and drift-control examples for **Veeam Backup for Microsoft Azure**, using its REST API. Policies, repositories (including Veeam Data Cloud Vault), and users and roles (detect only). Runs locally in PowerShell 7 or as Azure DevOps pipelines. |
-| [VBR](VBR/) | Examples for automating **Veeam Backup & Replication**. More to be added. |
+| [VBR](VBR/) | Example Terraform scripts to deploy a **Veeam Backup & Replication (VBR) 13** server in Microsoft Azure from the Azure Marketplace. More examples to be added. |
 
 Start with the README inside the folder you are interested in. It explains the prerequisites, what must be edited before use, and how to run the examples.
 
