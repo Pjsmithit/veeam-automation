@@ -1,0 +1,45 @@
+# Example variables: password supplied manually (quick testing only).
+# Copy to manual.tfvars (git-ignored) and replace every <LABEL> with your own value.
+#
+# For anything beyond a quick test, keep the password out of this file and set it
+# in your shell instead (and remove the admin_password line below):
+#   PowerShell: $env:TF_VAR_admin_password = "<ADMIN_PASSWORD>"
+#   Bash:       export TF_VAR_admin_password='<ADMIN_PASSWORD>'
+
+subscription_id = "<AZURE_SUBSCRIPTION_ID>"
+location        = "<AZURE_REGION>" # e.g. the region short name from: az account list-locations -o table
+
+# Resource names (adjust to your naming standard)
+resource_group_name   = "<RESOURCE_GROUP_NAME>"
+vnet_name             = "<VNET_NAME>"
+subnet_name           = "<SUBNET_NAME>"
+nsg_name              = "<NSG_NAME>"
+nsg_rule_name         = "<NSG_RDP_RULE_NAME>"
+public_ip_name        = "<PUBLIC_IP_NAME>"
+nic_name              = "<NIC_NAME>"
+ip_configuration_name = "<IP_CONFIGURATION_NAME>"
+vm_name               = "<VM_NAME>"
+computer_name         = "<WINDOWS_HOSTNAME>" # max 15 chars
+
+# Network
+vnet_address_space      = ["<VNET_CIDR>"]
+subnet_address_prefixes = ["<SUBNET_CIDR>"]
+allowed_rdp_cidr        = "<YOUR_PUBLIC_IP>/32" # RDP is only opened to this range
+
+# VM
+vm_size         = "<VM_SIZE>" # e.g. 4 vCPU / 16 GB or larger; check Veeam system requirements
+os_disk_size_gb = 256
+os_disk_type    = "Premium_LRS"
+admin_username  = "<ADMIN_USERNAME>"
+
+# Marketplace image. The plan selects the Veeam version; "latest" only picks the
+# newest build within that plan. Find values with:
+#   az vm image list --publisher veeam --all -o table
+image_publisher = "veeam"
+image_offer     = "veeam-backup-replication"
+image_plan      = "veeam-backup-replication-v13"
+image_version   = "latest"
+
+# Password source
+use_key_vault  = false
+admin_password = "<ADMIN_PASSWORD>" # testing only; or omit this line and set TF_VAR_admin_password instead

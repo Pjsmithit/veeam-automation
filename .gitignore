@@ -13,6 +13,23 @@ tmp-baseline/
 *.pem
 *.key
 
+# Terraform: real variable files and state can contain the admin password
+*.tfvars
+!*.tfvars.example
+*.tfvars.json
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+tfplan
+*.tfplan
+# .terraform.lock.hcl is intentionally NOT ignored: commit it to pin provider versions
+
 # OS and editor files
 .DS_Store
 Thumbs.db
