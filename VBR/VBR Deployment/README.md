@@ -1,5 +1,18 @@
 # Deploy Veeam Backup & Replication from the Azure Marketplace with Terraform
 
+> ## Important: example code only, not supported by Veeam
+>
+> **Everything in this repository is example code, shared for learning and inspiration only.**
+>
+> - It is **not an official Veeam product, tool, or reference implementation**.
+> - It is **not supported, maintained, reviewed or endorsed by Veeam Software.** Do not open Veeam support cases about it, and do not expect Veeam to fix, update or answer questions about it.
+> - It is provided **"as is", with no warranty of any kind**. You use it entirely **at your own risk**.
+> - Some examples can **create, change or delete** configuration on a backup server or appliance. **Always test in a non-production lab first** and review every script before running it.
+>
+> "Veeam" and related names are trademarks of Veeam Software. They are used here only to describe what the examples work with, and no affiliation or endorsement is implied. The views and code here are those of the author and do not represent Veeam.
+
+---
+
 This example deploys a Veeam Backup & Replication (VBR) server on a Windows VM in Azure using a Marketplace image.
 
 It creates:
