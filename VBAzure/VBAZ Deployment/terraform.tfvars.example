@@ -1,0 +1,53 @@
+# ---------------------------------------------------------------------
+# Veeam Backup for Microsoft Azure - deployment settings
+# Copy this file to terraform.tfvars and edit. This is the ONLY file you need to change.
+# ---------------------------------------------------------------------
+
+# ===== REQUIRED =====
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Who may reach SSH (22) and the web UI (443) - e.g. your office / VPN range
+allowed_source_cidrs = ["203.0.113.0/24"]
+
+# Existing storage account + container that holds the install script and Veeam packages
+storage_account_name           = "mystorageacct"
+storage_account_resource_group = "rg-shared"
+container_name                 = "vba"
+
+# Exact blob names of the Veeam .deb files in that container
+# (the install script itself is Install-Veeam.Azure.Service.sh - see script_blob_name below)
+package_blob_names = [
+  "veeam-sentry-srl_1.0.2_amd64.deb",
+  "veeam-sentry_3.0.19_amd64.deb",
+  "veeam-updater_13.1.207.0_amd64.deb",
+  "veeamflr-azure_11.0.0.47_amd64.deb",
+  "veeamazurebackup_9.0.0.402_amd64.deb",
+]
+
+# Admin password: NOT set here. Use ONE of:
+#   a) default: Terraform prompts for it when you run apply, or set an environment variable beforehand:
+#        PowerShell: $env:TF_VAR_admin_password = '<password>'
+#        Bash:       export TF_VAR_admin_password='<password>'
+#   b) Azure Key Vault: copy keyvault.tfvars.example to keyvault.tfvars and run
+#        terraform apply -var-file=keyvault.tfvars
+
+# Network: to deploy into an EXISTING VNet/subnet, fill in all three lines.
+# Leave them empty ("") to create a new VNet and subnet.
+existing_vnet_name           = ""
+existing_vnet_resource_group = ""
+existing_subnet_name         = ""
+
+
+# ===== OPTIONAL (shown with their default values; change as needed) =====
+
+location            = "westeurope"
+resource_group_name = "rg-vbazure"
+vm_name             = "vbazure01"
+vm_size             = "Standard_D4s_v5"
+os_disk_size_gb     = 128
+admin_username      = "veeamadmin"
+assign_public_ip    = true # false if egress is via NAT Gateway / firewall
+script_blob_name    = "Install-Veeam.Azure.Service.sh"
+script_args         = "" # "" = online, "-o" = offline
+tags                = {}

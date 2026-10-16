@@ -1,0 +1,23 @@
+# ---------------------------------------------------------------------
+# Read the VM admin password from Azure Key Vault instead of an environment variable.
+#
+# Copy to keyvault.tfvars, edit, then run:
+#   terraform apply -var-file=keyvault.tfvars
+# (terraform.tfvars is still loaded automatically; do NOT set a real admin_password
+#  anywhere - it must stay "" below when Key Vault is used.)
+#
+# Requirements:
+#   - The secret already exists in the vault (the secret VALUE is the password;
+#     12-72 chars, 3 of: lower, upper, digit, symbol).
+#   - The identity running Terraform can read secrets in that vault:
+#       RBAC vault:          role "Key Vault Secrets User"
+#       Access-policy vault: "Get" permission on secrets
+#   - If the vault has a firewall, the machine running Terraform must be allowed through it.
+# ---------------------------------------------------------------------
+
+# Required with Key Vault: leaving this empty stops Terraform prompting for a password.
+admin_password = ""
+
+key_vault_name           = "my-keyvault"
+key_vault_resource_group = "rg-shared"
+key_vault_secret_name    = "vbazure-admin-password"
