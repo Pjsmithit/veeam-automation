@@ -1,11 +1,17 @@
 # Deploy Veeam Backup for Microsoft Azure with Terraform
 
-> **Disclaimer: sample code only, not supported by Veeam.**
-> These scripts are provided as an example. They are **not** an official Veeam product or deliverable
-> and are **not supported by Veeam** in any way. They are provided "as is", without warranty of any kind.
-> **Use is entirely at your own risk.** Before using them, you should read and **fully understand all of the
-> code**, test it in a non-production environment, and make sure it meets your own security, compliance and
-> operational requirements. You are responsible for any costs, changes or impact on your Azure environment.
+> ## Important: example code only, not supported by Veeam
+>
+> **Everything in this repository is example code, shared for learning and inspiration only.**
+>
+> - It is **not an official Veeam product, tool, or reference implementation**.
+> - It is **not supported, maintained, reviewed or endorsed by Veeam Software.** Do not open Veeam support cases about it, and do not expect Veeam to fix, update or answer questions about it.
+> - It is provided **"as is", with no warranty of any kind**. You use it entirely **at your own risk**.
+> - Some examples can **create, change or delete** configuration on a backup server or appliance. **Always test in a non-production lab first** and review every script before running it.
+>
+> "Veeam" and related names are trademarks of Veeam Software. They are used here only to describe what the examples work with, and no affiliation or endorsement is implied. The views and code here are those of the author and do not represent Veeam.
+
+---
 
 Creates an Ubuntu 22.04 VM and installs the appliance by running the Veeam install script
 (via the Azure CustomScript extension), pulling the script and packages from your storage account.
