@@ -171,6 +171,17 @@ variable "pre_install_command" {
   default     = "export DEBIAN_FRONTEND=noninteractive && apt-get update -qq && apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold ./veeam-sentry*.deb && "
 }
 
+variable "post_install_command" {
+  description = <<-EOT
+    Shell snippet run AFTER the install script. The extension runs as root; root-owned files under
+    /home/veeamazure make Veeam.Azure.Service crash at startup (.NET cannot create its named-mutex
+    directory). This restores ownership, restarts the service, and fails the extension if the
+    service is not active. Must start with ";" (or be empty to disable).
+  EOT
+  type        = string
+  default     = "; rc=$?; id veeamazure >/dev/null 2>&1 && chown -R veeamazure: /home/veeamazure; systemctl reset-failed veeamazurebackup; systemctl restart veeamazurebackup; sleep 15; systemctl is-active --quiet veeamazurebackup && exit $rc"
+}
+
 variable "tags" {
   description = "Tags applied to all resources."
   type        = map(string)

@@ -232,7 +232,7 @@ resource "azurerm_virtual_machine_extension" "install" {
   protected_settings = jsonencode({
     fileUris         = local.file_uris
     managedIdentity  = {}
-    commandToExecute = "${var.pre_install_command}bash ./${var.script_blob_name} ${var.script_args}"
+    commandToExecute = "${var.pre_install_command}bash ./${var.script_blob_name} ${var.script_args}${var.post_install_command}"
   })
 
   timeouts {
